@@ -123,7 +123,7 @@
   <div style="background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.18);padding:34px 30px;width:340px">
     <div style="font-size:20px;font-weight:700;margin-bottom:4px">🗂️ CRM 客户管理系统</div>
     <div class="hint" style="margin-bottom:18px">请登录后使用</div>
-    <div class="field" style="margin-bottom:12px"><label>邮箱</label><input id="login_user" type="email" autocomplete="username" placeholder="如 yhm@yg.crm"></div>
+    <div class="field" style="margin-bottom:12px"><label>邮箱</label><input id="login_user" type="email" autocomplete="username" placeholder="如 name@company.com"></div>
     <div class="field" style="margin-bottom:6px"><label>密码</label><input id="login_pass" type="password" autocomplete="current-password"></div>
     <div id="loginErr" style="color:var(--red);font-size:12px;min-height:16px;margin:4px 0"></div>
     <button class="btn" style="width:100%;padding:10px" onclick="login()">登 录</button>
@@ -202,19 +202,14 @@
 
   <!-- ============ DATA ============ -->
   <section id="view-data" class="view">
-    <div class="panel" style="border-color:#c7d2fe;background:#f5f7ff">
-      <h3>🔄 同步 YG 团队数据（Notion）</h3>
-      <p class="hint">一键导入从 Notion「YG客户数据库 → 姚子泓潜在客户」<b>全量同步的 117 家</b>潜在客户（负责人＝姚子泓）。会按公司名去重，可反复点不会重复添加。<br>
-      <b>后续 Notion 有更新时</b>：在 Notion 打开该数据库 →「•••」→ 导出 → 选「CSV」→ 再用下方「导入客户」上传即可增量更新（已自动适配 YG 表头与「负责人」列）。</p>
+    <div class="panel">
+      <h3>🌊 导入公海客户</h3>
+      <p class="hint">把公海资料批量导入独立公海库（已按公司名去重，可与潜在客户同时存在同一公司）。支持 <b>Excel/CSV</b> 与 <b>TXT 名单</b>。</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-        <button class="btn" onclick="loadYG()">🔄 导入 YG 团队数据（姚子泓潜在客户 · 117 家）</button>
-        <button class="btn" onclick="loadYGVisits()">🏅 导入 YG 拜访记录（31 条 → 已拜访客户）</button>
-        <button class="btn" onclick="loadYGPool()">🌊 导入 YG 公共资料区（→ 公海客户）</button>
         <label class="btn ghost">📁 导入公海（Excel/CSV）<input type="file" id="poolImportFile" accept=".csv,.xlsx,.xls" style="display:none"></label>
         <label class="btn ghost">📄 导入 TXT 名单到公海<input type="file" id="poolTxtImportFile" accept=".txt" style="display:none"></label>
       </div>
       <p class="hint" style="margin-top:6px">📄 <b>TXT 名单导入</b>：支持探迹 / 阿里金品那种「一段一家公司」的自由文本名单（含 法定代表人 / 注册地址 / 阿里 / 主营产品 等）。自动抽取公司名、联系人、电话、地址、主营产品、阿里链接、官网并按公司名去重入公海，来源标记为文件名。多个名单可分次上传。</p>
-      <p class="hint" style="margin-top:8px">公海客户为<b>独立资料库</b>（已按公司去重），可与潜在客户同时存在同一公司。公共资料区 6 张表数据量较大，完整同步建议在 Notion 把每张表「导出 CSV」后用上方「导入公海 CSV」上传（已适配各表表头）。</p>
     </div>
     <div class="panel">
       <h3>📥 导入客户（Excel / CSV）</h3>
@@ -250,7 +245,7 @@
       <input type="text" id="visitedSearch" placeholder="🔍 搜索公司 / 决策人 / 拜访人">
       <select id="visitedOwner"><option value="">全部负责人</option></select>
       <div class="spacer"></div>
-      <div class="hint">已拜访客户＝潜在客户中标记「已拜访」的客户（含从 YG 拜访记录同步的）。</div>
+      <div class="hint">已拜访客户＝潜在客户中标记「已拜访」的客户。</div>
     </div>
     <div id="visitedList" class="tbl-wrap"></div>
   </section>
@@ -281,7 +276,7 @@
   <!-- ============ USERS (admin) ============ -->
   <section id="view-users" class="view">
     <div class="toolbar">
-      <div class="hint" style="flex:1">每个业务员登录后只能看到「自己新增的客户」+「公共客户」；管理员（YG主管）可见全部并管理用户与数据。</div>
+      <div class="hint" style="flex:1">每个业务员登录后只能看到「自己新增的客户」+「公共客户」；管理员（主管）可见全部并管理用户与数据。</div>
       <button class="btn" onclick="openUser()">＋ 新增用户</button>
     </div>
     <div id="userList" class="tbl-wrap"></div>
@@ -414,10 +409,10 @@
     <div class="modal-head"><h3 id="userModalTitle">新增用户</h3><button class="x" onclick="closeModal('userModal')">×</button></div>
     <div class="modal-body">
       <div class="form-grid">
-        <div class="field full"><label>姓名（用作客户负责人）*</label><input id="u_name" placeholder="如：姚子泓"></div>
+        <div class="field full"><label>姓名（用作客户负责人）*</label><input id="u_name" placeholder="如：张三"></div>
         <div class="field"><label>登录邮箱 *</label><input id="u_username" type="email" autocomplete="off" placeholder="如 yzh@yg.crm"></div>
         <div class="field"><label>密码 *（≥6位）</label><input id="u_password" autocomplete="off"></div>
-        <div class="field full"><label>角色</label><select id="u_role"><option value="sales">业务员（仅看自己+公共客户）</option><option value="admin">管理员 / YG主管（全部+用户与数据管理）</option></select></div>
+        <div class="field full"><label>角色</label><select id="u_role"><option value="sales">业务员（仅看自己+公共客户）</option><option value="admin">管理员 / 主管（全部+用户与数据管理）</option></select></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -434,9 +429,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="yg-data.js"></script>
-<script src="yg-visits.js"></script>
-<script src="yg-pool.js"></script>
 <script>
 /* ===================== Config / options ===================== */
 const STAGES = ["陌拜客户","潜在客户","初步接触","跟进中","已拜访","已成交","已流失"];
@@ -457,19 +449,8 @@ const SESS_KEY = "crm_session_user";
 function load(){ try{const r=localStorage.getItem(LS_KEY); if(r) DB=JSON.parse(r);}catch(e){}
   if(!DB.users) DB.users=[];
   if(!DB.pool) DB.pool=[];
-  (DB.customers||[]).forEach(c=>{if(c.stage==="已报价")c.stage="已拜访"; if(c.owner==="社媒主管")c.owner="YG主管"; if(c.inPool)delete c.inPool;});
-  (DB.users||[]).forEach(u=>{if(u.name==="社媒主管")u.name="YG主管";});
-  // 首次使用：建默认用户（管理员=YG主管，业务员=姚子泓）
-  if(DB.users.length===0){
-    DB.users=[
-      {id:uid(),name:"YG主管",username:"yhm",password:"YG081020",role:"admin"},
-      {id:uid(),name:"姚子泓",username:"yzh",password:"123456",role:"sales"}
-    ];
-    save();
-  }
-  // 迁移：把旧默认管理员 admin/admin888 更新为 yhm/YG081020（不影响已自定义的账号）
-  const oldAdmin=DB.users.find(u=>u.username==="admin"&&u.password==="admin888"&&u.role==="admin");
-  if(oldAdmin){ oldAdmin.username="yhm"; oldAdmin.password="YG081020"; save(); }
+  (DB.customers||[]).forEach(c=>{if(c.stage==="已报价")c.stage="已拜访"; if(c.owner==="社媒主管")c.owner="主管"; if(c.inPool)delete c.inPool;});
+  (DB.users||[]).forEach(u=>{if(u.name==="社媒主管")u.name="主管";});
 }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(DB)); cloudSync(); }
 
@@ -1197,7 +1178,7 @@ const CSV_FIELDS=[["code","编号"],["name","公司名字"],["owner","负责人"
   ["tradeContact","外贸部联系人"],["tradePhone","外贸部联系电话"],["product","主营产品"],
   ["address","客户地址"],["source","客户来源"],["platformUrl","平台网址"],["siteUrl","独立站网址"],
   ["peerCase","同行案例"],["createDate","建立日期"],["nextFollow","下次跟进"],["note","备注"]];
-// 兼容 Notion / YG 导出表头的别名（全角括号、冒号、不同叫法）
+// 兼容常见导出表头的别名（全角括号、冒号、不同叫法）
 const HEADER_ALIASES={
   "name":["公司名称","公司"],"owner":["业务员","跟进人","负责业务员"],
   "contact":["联系人（A)","联系人(A)","联系人（A）","老板","决策人"],
@@ -1415,63 +1396,11 @@ function loadSample(){
 }
 function addDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 
-/* 一键导入 YG 团队数据（姚子泓潜在客户） */
-function loadYG(){
-  if(typeof window.YG_SEED==="undefined"){toast("未找到 yg-data.js，请确认它与本页面在同一文件夹");return;}
-  const seed=window.YG_SEED, owner=seed.owner||"姚子泓";
-  const existing=new Set(DB.customers.map(c=>c.name));
-  let added=0,skip=0;
-  seed.customers.forEach(s=>{
-    if(existing.has(s.name)){skip++;return;}
-    DB.customers.push(Object.assign({
-      id:uid(),code:nextCode(),owner:owner,stage:"潜在客户",source:s.custSource||seed.source||""
-    },s,{source:s.custSource||seed.source||""}));
-    existing.add(s.name);added++;
-  });
-  save();refreshDynamic();renderDash();renderCustomers();
-  toast("YG 同步完成：新增 "+added+" 家"+(skip?"，跳过重复 "+skip+" 家":"")+"（负责人："+owner+"）");
-}
-
 /* 从字符串里提取干净的网址 */
 function cleanUrl(s){ if(!s)return""; s=String(s);
   const m=s.match(/https?:\/\/[^\s)\]，、）]+/); if(m)return m[0];
   const m2=s.match(/www\.[^\s)\]，、）]+/); return m2?("http://"+m2[0]):""; }
 
-/* 一键导入 YG 拜访记录：写入拜访时间线 + 标记/建档「已拜访客户」 */
-function loadYGVisits(){
-  if(typeof window.YG_VISITS==="undefined"){toast("未找到 yg-visits.js，请确认它与本页面在同一文件夹");return;}
-  const recs=window.YG_VISITS.records;
-  let custNew=0,custUpd=0,visAdd=0;
-  recs.forEach(r=>{
-    let c=DB.customers.find(x=>x.name===r.company);
-    if(!c){
-      c={id:uid(),code:nextCode(),name:r.company,owner:r.owner||"",attr:r.attr||"",region:"",
-         contact:r.decider||r.otherContact||"",phone:r.deciderPhone||r.otherPhone||"",
-         product:r.product||"",address:r.address||"",source:r.source||"",
-         platformUrl:cleanUrl(r.platform),siteUrl:cleanUrl(r.site),
-         tradeContact:r.otherContact||"",tradePhone:r.otherPhone||"",
-         stage:"已拜访",visited:"已拜访",isPublic:false};
-      DB.customers.push(c);custNew++;
-    } else {
-      c.visited="已拜访";
-      if(!["已成交","已流失"].includes(c.stage)) c.stage="已拜访";
-      if(!c.owner&&r.owner) c.owner=r.owner;
-      custUpd++;
-    }
-    // 仅防止「同一条记录」重复导入（公司+日期+拜访人），不同记录/同公司多次拜访均保留，不做公司去重
-    const dup=DB.visits.some(v=>v._yg&&v.customerId===c.id&&v.date===r.date&&(v.visitor||"")===(r.visitor||"")&&(v.company||"")===r.company);
-    if(!dup){
-      const sit=[r.notes,r.signed?("是否签收："+r.signed):"",r.otherContact?("其他联系人："+r.otherContact+(r.otherPhone?" "+r.otherPhone:"")):"",r.source?("客户来源："+r.source):""].filter(Boolean).join("\n");
-      DB.visits.push({id:uid(),_yg:true,type:"拜访",title:"拜访｜"+r.company,date:r.date,
-        company:r.company,owner:r.owner||"",attr:r.attr||"",signed:r.signed||"",notes:r.notes||"",product:r.product||"",
-        visitor:r.visitor||"",decider:r.decider||"",phone:r.deciderPhone||"",address:r.address||"",
-        situation:sit,result:(r.signed==="已签收"?"已成交":""),nextFollow:"",customerId:c.id});
-      visAdd++;
-    }
-  });
-  save();refreshDynamic();renderDash();renderCustomers();renderVisits();renderVisited();
-  toast("YG拜访记录同步完成：拜访 "+visAdd+" 条；客户新建 "+custNew+"、更新 "+custUpd+"（已标记已拜访）");
-}
 
 /* 已拜访客户类目 —— 按公司去重，每家一行（取最近一次拜访 + 拜访次数） */
 function renderVisited(){
@@ -1486,7 +1415,7 @@ function renderVisited(){
   if(fo)rows=rows.filter(c=>(c.owner||"")===fo);
   if(q)rows=rows.filter(c=>{const lv=lastVisit(c)||{};return [c.name,c.contact,c.phone,c.product,lv.visitor||""].join(" ").toLowerCase().includes(q);});
   rows.sort((a,b)=>{const x=recency(a),y=recency(b);return x>y?-1:x<y?1:0;});
-  if(!rows.length){$("#visitedList").innerHTML=`<div class="empty">暂无已拜访客户。到「数据管理 → 导入 YG 拜访记录」即可同步，或在客户详情里新增拜访。</div>`;return;}
+  if(!rows.length){$("#visitedList").innerHTML=`<div class="empty">暂无已拜访客户。在客户详情里新增拜访即可。</div>`;return;}
   const total=rows.length, pageRows=pageSlice(rows,"visited"), pageIds=pageRows.map(c=>c.id);
   const cols=["公司名字","负责人","阶段","属性","区域","联系人","电话"];
   $("#visitedList").innerHTML=bulkBar("visited")+`<div style="padding:8px 12px;color:var(--muted);font-size:12px">共 ${total} 家已拜访客户</div><table><thead><tr>${selHead("visited",pageIds)}${cols.map(t=>`<th>${t}</th>`).join("")}<th>最近拜访</th><th>拜访次数</th><th></th></tr></thead><tbody>${
@@ -1592,7 +1521,7 @@ function renderPool(){
   if(fa)rows=rows.filter(c=>c.attr===fa);
   if(q)rows=rows.filter(c=>[c.name,c.contact,c.phone,c.product,c.region,c.origin].join(" ").toLowerCase().includes(q));
   rows.sort((a,b)=>{const x=poolRecency(a),y=poolRecency(b);return x>y?-1:x<y?1:0;});
-  if(!rows.length){$("#poolList").innerHTML=`<div class="empty">公海暂无客户。到「数据管理 → 导入 YG 公共资料区」一键导入，或在客户详情里点「放入公海」。</div>`;return;}
+  if(!rows.length){$("#poolList").innerHTML=`<div class="empty">公海暂无客户。到「数据管理 → 导入公海客户」批量导入，或在客户详情里点「放入公海」。</div>`;return;}
   const mine=new Set(DB.customers.filter(c=>c.owner===CURRENT.name).map(c=>c.name));
   const total=rows.length, pageRows=pageSlice(rows,"pool");
   const pageIds=pageRows.map(c=>c.id);
@@ -1726,15 +1655,7 @@ function deletePool(){
   DB.pool=DB.pool.filter(p=>p.id!==editPoolId);
   save();closeModal("poolModal");renderPool();toast("已删除");
 }
-// 一键导入 YG 公共资料区样本到公海
-function loadYGPool(){
-  if(typeof window.YG_POOL==="undefined"){toast("未找到 yg-pool.js，请确认它与本页面在同一文件夹");return;}
-  const recs=window.YG_POOL.records; let added=0,skip=0;
-  const have=new Set([...(DB.pool||[]).map(p=>p.name), ...DB.customers.map(c=>c.name)]); // 公海+潜在客户去重
-  recs.forEach(r=>{ if(!r.name||have.has(r.name)){skip++;return;} DB.pool.push(Object.assign({id:uid()},r)); have.add(r.name); added++; });
-  save();renderPool();toast("公海资料导入完成：新增 "+added+" 家"+(skip?"，跳过重复 "+skip+" 家":""));
-}
-// 公海 CSV 导入（适配公共资料区各表表头）
+// 公海 CSV 导入（适配各表表头）
 const POOL_ALIASES={
   name:["公司名字","名称","公司名称","公司"],
   contact:["联系人（A)","联系人(A)","决策人（A)","决策人(A）","决策人(A)","老板","股东"],
@@ -1783,18 +1704,18 @@ function importPoolCSV(input,originName){
 /* ===================== 用户管理（管理员） ===================== */
 function renderUserBox(){
   if(!CURRENT){$("#userBox").innerHTML="";return;}
-  $("#userBox").innerHTML=`<span style="font-size:13px;color:var(--muted)">${esc(CURRENT.name)}（${isAdmin()?"YG主管":"业务员"}）</span>
+  $("#userBox").innerHTML=`<span style="font-size:13px;color:var(--muted)">${esc(CURRENT.name)}（${isAdmin()?"主管":"业务员"}）</span>
     <button class="btn ghost sm" onclick="logout()">退出</button>`;
 }
 function renderUsers(){
-  if(!isAdmin()){ $("#userList").innerHTML=`<div class="empty">仅管理员（YG主管）可访问</div>`; return; }
+  if(!isAdmin()){ $("#userList").innerHTML=`<div class="empty">仅管理员（主管）可访问</div>`; return; }
   $("#userList").innerHTML=`<table><thead><tr><th>姓名</th><th>登录用户名</th><th>角色</th><th>名下客户</th><th></th></tr></thead><tbody>${
     DB.users.map(u=>{
       const cnt=DB.customers.filter(c=>c.owner===u.name).length;
       return `<tr>
         <td style="font-weight:600">${esc(u.name)}</td>
         <td>${esc(u.username)}</td>
-        <td>${pill(u.role==='admin'?'YG主管':'业务员', u.role==='admin'?'#7c3aed':'#0ea5e9')}</td>
+        <td>${pill(u.role==='admin'?'主管':'业务员', u.role==='admin'?'#7c3aed':'#0ea5e9')}</td>
         <td>${cnt}</td>
         <td><div style="display:flex;gap:6px"><button class="btn ghost sm" onclick="openUser('${u.id}')">编辑</button>${(CURRENT&&u.id!==CURRENT.id)?`<button class="btn ghost sm" style="color:var(--red)" onclick="delUser('${u.id}','${esc(u.name)}')">删除</button>`:'<span style="color:var(--muted);font-size:12px;align-self:center">（当前登录）</span>'}</div></td>
       </tr>`;
