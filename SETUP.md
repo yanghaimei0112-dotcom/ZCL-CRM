@@ -68,8 +68,11 @@ python3 -m http.server 8000
 
 ---
 
-## 可选：支持在「用户管理」里删除账号
+## 用户管理：删除账号
 
-原系统删除账号会调用一个名为 `admin-user` 的 Supabase Edge Function
-（需要 service_role 权限）。不部署也不影响使用，只是「删除账号」按钮会报错。
-需要的话告诉我，我给你补这个 Edge Function 的部署步骤。
+删除账号用一个数据库函数 `admin_delete_user`（无需 Edge Function / service_role）。
+在 SQL Editor 运行 `supabase-delete-user.sql` 即可：它会（1）确认所有未确认的账号，
+（2）创建删除函数。之后「用户管理」里的删除按钮即可正常使用（仅管理员可删、不能删自己）。
+
+> 若新建账号登录报「Email not confirmed」，说明 Authentication → Providers → Email
+> 里的 **Confirm email** 还开着；关掉它，新账号即可直接登录。

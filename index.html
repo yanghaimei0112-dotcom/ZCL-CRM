@@ -1978,13 +1978,8 @@ async function delUser(id,name){
   const cnt=DB.customers.filter(c=>c.owner===name).length;
   if(!confirm("确定删除账号「"+name+"」？\n删除后该账号无法再登录。"+(cnt?"\n其名下 "+cnt+" 家客户不会被删除，会保留（可由管理员转交他人）。":"")))return;
   toast("正在删除…");
-  const {data:{session}}=await SB.auth.getSession();
-  let r,j;
-  try{
-    r=await fetch(SB_URL+"/functions/v1/admin-user",{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+(session?session.access_token:"")},body:JSON.stringify({action:"delete",userId:id})});
-    j=await r.json().catch(()=>({}));
-  }catch(e){toast("删除失败："+e.message);return;}
-  if(!r.ok||j.error){toast("删除失败："+(j.error||("HTTP "+r.status)));return;}
+  const {error}=await SB.rpc("admin_delete_user",{target:id});
+  if(error){ toast("删除失败："+error.message+(/function.*admin_delete_user|does not exist|schema cache/i.test(error.message)?"（请先在 Supabase 运行删除账号的 SQL）":"")); return; }
   DB.users=DB.users.filter(u=>u.id!==id); buildNameMaps(); renderUsers(); refreshDynamic();
   toast("已删除账号："+name);
 }
