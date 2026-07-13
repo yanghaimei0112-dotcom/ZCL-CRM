@@ -1318,7 +1318,7 @@ function nlUrl(s){ let m=String(s).match(/https?:\/\/[^\s，、）)]+/); if(m)re
 const NL_STATUS=/(存续|在业|曾用名|小微企业|企业集团|高新技术企业|企业族群|注销|吊销)/;
 function parseNameListTxt(text){
   text=String(text).replace(/\r\n/g,"\n");
-  const blocks=("\n"+text).split(/\n(?=\d+[.、．]?\s*[一-龥A-Za-z])/).map(b=>b.trim()).filter(Boolean);
+  const blocks=("\n"+text).split(/\n(?=\d+[.、．]?[ \t　]*[一-龥A-Za-z])/).map(b=>b.trim()).filter(Boolean);
   const out=[];
   for(const b of blocks){
     const lines=b.split("\n").map(l=>l.trim()).filter(Boolean);
@@ -1345,6 +1345,35 @@ function parseNameListTxt(text){
     let product=prod.filter(Boolean).join("、").replace(/，/g,"、"); if(product.length>380)product=product.slice(0,380);
     const address=(addr||addr2).trim();
     out.push({name,region:nlRegion(address||name),contact,phone,product,address,platformUrl:plat,siteUrl:(site||site2)});
+  }
+  return out;
+}
+/* 阿里金品导出（Word）专用解析：每家以「序号.」独占一行分隔；裸阿里链接、裸产品行等 */
+const ALI_NOISE=/^(营业|存续|在业|注销|吊销|标签|来自|年报|其他|暂无跟进|注册资本|成立时间|年营业额|企业官网|注册地址|地址|法定代表人|经营者|电话|邮箱|统一社会|信用代码|联系)/;
+function parseAliDocx(text){
+  const L=String(text).replace(/\r\n/g,"\n").split("\n").map(s=>s.trim());
+  const idx=[]; L.forEach((l,i)=>{ if(/^\d{1,3}[.．、]?$/.test(l)) idx.push(i); });
+  if(!idx.length) return [];
+  const out=[];
+  for(let k=0;k<idx.length;k++){
+    const lines=L.slice(idx[k]+1, (k+1<idx.length)?idx[k+1]:L.length).filter(Boolean);
+    if(!lines.length) continue;
+    let name="";
+    for(const l of lines){ if(/(公司|厂|合伙|中心)/.test(l) && !/alibaba\.com|https?:/i.test(l)){ name=l.split(/(存续|在业|注销|吊销|营业)/)[0].trim(); break; } }
+    if(!name) continue;
+    let platformUrl="",note="",contact="",phone="",site="",address="",prodExplicit="";
+    const prodBare=[]; let afterAddr=false;
+    for(const l of lines){
+      if(/alibaba\.com/i.test(l)){ if(!platformUrl){const m=l.match(/https?:\/\/[A-Za-z0-9.\-]+\.alibaba\.com[^\s，、）)]*/i); if(m)platformUrl=m[0];} const r=l.match(/\d+金\d*星?|\d+星/); if(r&&!note)note=r[0]; afterAddr=false; continue; }
+      if(/^(法定代表人|经营者)[：:]/.test(l)){ const m=l.replace(/^(法定代表人|经营者)[：:]\s*/,"").match(/^([^\s\d%＊*]+)/); if(m&&!contact)contact=m[1]; if(!phone){const p=l.match(/1[3-9]\d{9}/);if(p)phone=p[0];} afterAddr=false; continue; }
+      if(/^企业官网[：:]/.test(l)){ const v=l.replace(/^企业官网[：:]\s*/,"").trim(); if(v&&v!=="--"&&v!=="-"&&!site)site=nlUrl(v); afterAddr=false; continue; }
+      if(/^(注册地址|地址)[：:]/.test(l)){ if(!address)address=l.replace(/^(注册地址|地址)[：:]\s*/,"").trim(); afterAddr=true; continue; }
+      if(/^主营产品[：:]/.test(l)){ if(!prodExplicit)prodExplicit=l.replace(/^主营产品[：:]\s*/,"").trim(); afterAddr=false; continue; }
+      if(!phone){ const p=l.match(/(?<!\d)1[3-9]\d{9}(?!\d)/); if(p)phone=p[0]; }
+      if(afterAddr && !ALI_NOISE.test(l) && !/^\d/.test(l) && !/[%＊]|\*\*|·/.test(l)) prodBare.push(l);
+    }
+    let product=prodExplicit || prodBare.join("、"); if(product.length>380)product=product.slice(0,380);
+    out.push({name,region:nlRegion(address||name),contact,phone,product,address,platformUrl,siteUrl:site,note});
   }
   return out;
 }
@@ -1407,10 +1436,11 @@ $("#poolWordImportFile").addEventListener("change",async e=>{
       const res=importPoolCSV(rows, origin);
       if(res.error){toast("Word 表格："+res.error);}
       else{ save();renderPool();refreshDynamic();toast("Word 导入完成（表格）：新增 "+res.added+" 家"+(res.updated?"，补全 "+res.updated+" 家":"")+(res.skip?"，跳过 "+res.skip+" 家":"")); }
-    } else { // 无表格：按「一段一家公司」自由文本
+    } else { // 无表格：先按阿里金品格式（序号独占一行），否则回退通用名单解析
       const {value:text}=await mammoth.extractRawText({arrayBuffer:await readArrayBuffer(file)});
-      const recs=parseNameListTxt(text);
-      if(!recs.length){toast("未从该 Word 解析出公司（既无「公司名字」表格，也非「一段一家公司」名单）");e.target.value="";return;}
+      let recs=parseAliDocx(text);
+      if(recs.length<2) { const alt=parseNameListTxt(text); if(alt.length>recs.length) recs=alt; }
+      if(!recs.length){toast("未从该 Word 解析出公司（既无「公司名字」表格，也非可识别的名单格式）");e.target.value="";return;}
       const poolNames=new Set((DB.pool||[]).map(p=>p.name)), custNames=new Set(DB.customers.map(c=>c.name)), seen=new Set();
       let added=0,skip=0;
       recs.forEach(r=>{
