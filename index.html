@@ -204,11 +204,13 @@
   <section id="view-data" class="view">
     <div class="panel">
       <h3>🌊 导入公海客户</h3>
-      <p class="hint">把公海资料批量导入独立公海库（已按公司名去重，可与潜在客户同时存在同一公司）。支持 <b>Excel/CSV</b> 与 <b>TXT 名单</b>。</p>
+      <p class="hint">把公海资料批量导入独立公海库（已按公司名去重，可与潜在客户同时存在同一公司）。支持 <b>Excel/CSV</b>、<b>Word（.docx）</b> 与 <b>TXT 名单</b>。</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
         <label class="btn ghost">📁 导入公海（Excel/CSV）<input type="file" id="poolImportFile" accept=".csv,.xlsx,.xls" style="display:none"></label>
+        <label class="btn ghost">📝 导入 Word（.docx）<input type="file" id="poolWordImportFile" accept=".docx" style="display:none"></label>
         <label class="btn ghost">📄 导入 TXT 名单到公海<input type="file" id="poolTxtImportFile" accept=".txt" style="display:none"></label>
       </div>
+      <p class="hint" style="margin-top:6px">📝 <b>Word 导入</b>：若文档里是<b>表格</b>（表头含「公司名字 / 名称」列），按表格逐行导入；若是「一段一家公司」的<b>自由文本</b>，则自动抽取公司名、联系人、电话、地址、主营产品、阿里链接、官网。来源标记为文件名。</p>
       <p class="hint" style="margin-top:6px">📄 <b>TXT 名单导入</b>：支持探迹 / 阿里金品那种「一段一家公司」的自由文本名单（含 法定代表人 / 注册地址 / 阿里 / 主营产品 等）。自动抽取公司名、联系人、电话、地址、主营产品、阿里链接、官网并按公司名去重入公海，来源标记为文件名。多个名单可分次上传。</p>
     </div>
     <div class="panel">
@@ -1316,7 +1318,7 @@ function nlUrl(s){ let m=String(s).match(/https?:\/\/[^\s，、）)]+/); if(m)re
 const NL_STATUS=/(存续|在业|曾用名|小微企业|企业集团|高新技术企业|企业族群|注销|吊销)/;
 function parseNameListTxt(text){
   text=String(text).replace(/\r\n/g,"\n");
-  const blocks=("\n"+text).split(/\n(?=\d+\.?[一-龥A-Za-z])/).map(b=>b.trim()).filter(Boolean);
+  const blocks=("\n"+text).split(/\n(?=\d+[.、．]?\s*[一-龥A-Za-z])/).map(b=>b.trim()).filter(Boolean);
   const out=[];
   for(const b of blocks){
     const lines=b.split("\n").map(l=>l.trim()).filter(Boolean);
@@ -1363,6 +1365,63 @@ $("#poolTxtImportFile").addEventListener("change",async e=>{
     });
     save();renderPool();refreshDynamic();
     toast("TXT 导入完成：解析 "+recs.length+" 家，新增 "+added+" 家"+(skip?"，跳过 "+skip+" 家":""));
+  }catch(err){toast("导入失败："+err.message);}
+  e.target.value="";
+});
+
+/* ===== Word（.docx）导入到公海：有表格→按表格逐行；无表格→按「一段一家公司」文本 ===== */
+let _mammothLoad=null;
+function ensureMammoth(){
+  if(window.mammoth)return Promise.resolve(window.mammoth);
+  if(_mammothLoad)return _mammothLoad;
+  _mammothLoad=new Promise((resolve,reject)=>{
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js";
+    s.onload=()=>window.mammoth?resolve(window.mammoth):reject(new Error("Word 解析库加载失败"));
+    s.onerror=()=>{_mammothLoad=null;reject(new Error("Word 解析库加载失败（需联网）"));};
+    document.head.appendChild(s);
+  });
+  return _mammothLoad;
+}
+function readArrayBuffer(file){return new Promise((res,rej)=>{const rd=new FileReader();rd.onerror=()=>rej(new Error("文件读取失败"));rd.onload=()=>res(rd.result);rd.readAsArrayBuffer(file);});}
+/* 从 Word 转出的 HTML 里取第一张表格 → 二维数组（首行表头） */
+function htmlFirstTableRows(html){
+  const doc=new DOMParser().parseFromString(html,"text/html");
+  const table=doc.querySelector("table"); if(!table)return null;
+  const rows=[];
+  table.querySelectorAll("tr").forEach(tr=>{
+    const cells=[...tr.querySelectorAll("th,td")].map(td=>td.textContent.replace(/\s+/g," ").trim());
+    if(cells.some(c=>c!==""))rows.push(cells);
+  });
+  return rows.length?rows:null;
+}
+$("#poolWordImportFile").addEventListener("change",async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{
+    toast("正在解析 Word…");
+    const mammoth=await ensureMammoth();
+    const origin=file.name.replace(/\.docx?$/i,"").replace(/\s+[0-9a-f]{32}$/i,"").trim();
+    const {value:html}=await mammoth.convertToHtml({arrayBuffer:await readArrayBuffer(file)});
+    const rows=htmlFirstTableRows(html);
+    if(rows){ // 表格：复用 Excel/CSV 公海导入逻辑
+      const res=importPoolCSV(rows, origin);
+      if(res.error){toast("Word 表格："+res.error);}
+      else{ save();renderPool();refreshDynamic();toast("Word 导入完成（表格）：新增 "+res.added+" 家"+(res.updated?"，补全 "+res.updated+" 家":"")+(res.skip?"，跳过 "+res.skip+" 家":"")); }
+    } else { // 无表格：按「一段一家公司」自由文本
+      const {value:text}=await mammoth.extractRawText({arrayBuffer:await readArrayBuffer(file)});
+      const recs=parseNameListTxt(text);
+      if(!recs.length){toast("未从该 Word 解析出公司（既无「公司名字」表格，也非「一段一家公司」名单）");e.target.value="";return;}
+      const poolNames=new Set((DB.pool||[]).map(p=>p.name)), custNames=new Set(DB.customers.map(c=>c.name)), seen=new Set();
+      let added=0,skip=0;
+      recs.forEach(r=>{
+        if(!r.name||poolNames.has(r.name)||custNames.has(r.name)||seen.has(r.name)){skip++;return;}
+        seen.add(r.name);
+        DB.pool.push(Object.assign({id:uid(),origin,attr:"",updatedAt:new Date().toISOString()},r));
+        added++;
+      });
+      save();renderPool();refreshDynamic();
+      toast("Word 导入完成（名单）：解析 "+recs.length+" 家，新增 "+added+" 家"+(skip?"，跳过 "+skip+" 家":""));
+    }
   }catch(err){toast("导入失败："+err.message);}
   e.target.value="";
 });
@@ -1658,7 +1717,7 @@ function deletePool(){
 // 公海 CSV 导入（适配各表表头）
 const POOL_ALIASES={
   name:["公司名字","名称","公司名称","公司"],
-  contact:["联系人（A)","联系人(A)","决策人（A)","决策人(A）","决策人(A)","老板","股东"],
+  contact:["联系人（A)","联系人(A)","决策人（A)","决策人(A）","决策人(A)","联系人","决策人","老板","股东"],
   phone:["电话","决策人（A)电话","决策人(A)电话","联系电话","股东联系方式"],
   attr:["客户属性"], region:["区域"], product:["主营产品"],
   address:["客户地址","公司地址","地址"], source:["客户来源","资料来源"],
