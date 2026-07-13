@@ -171,6 +171,7 @@
       <select id="filterAttr"><option value="">全部属性</option></select>
       <div class="spacer"></div>
       <div class="seg"><button id="segList" class="active">列表</button><button id="segKanban">看板</button></div>
+      <button class="btn ghost" onclick="openModal('myImportModal')">📥 导入客户</button>
       <button class="btn" onclick="openCustomer()">＋ 新增客户</button>
     </div>
     <div id="custList" class="tbl-wrap"></div>
@@ -421,6 +422,28 @@
       <button class="btn danger sm" id="userDeleteBtn" style="margin-right:auto;display:none" onclick="deleteUser()">删除</button>
       <button class="btn ghost" onclick="closeModal('userModal')">取消</button>
       <button class="btn" onclick="saveUser()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 我的导入 Modal（业务员自助导入，归自己名下） ===== -->
+<div class="modal-bg" id="myImportModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head"><h3>📥 导入我的客户</h3><button class="x" onclick="closeModal('myImportModal')">×</button></div>
+    <div class="modal-body">
+      <p class="hint">导入的每一家都会<b>自动归到你名下</b>（负责人＝当前登录人），阶段默认「潜在客户」。按公司名去重，重复的会跳过。</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+        <label class="btn">📁 Excel / CSV<input type="file" id="myImportFile" accept=".csv,.xlsx,.xls" style="display:none"></label>
+        <label class="btn">📝 Word（.docx）<input type="file" id="myWordFile" accept=".docx" style="display:none"></label>
+        <label class="btn">📄 TXT 名单<input type="file" id="myTxtFile" accept=".txt" style="display:none"></label>
+        <button class="btn ghost" onclick="downloadTemplate()">⬇️ 下载模板</button>
+      </div>
+      <p class="hint" style="margin-top:12px">• <b>Excel/CSV</b>：表头需含「公司名字」列（其余列名与系统字段一致即自动匹配；「负责人」列会被忽略，一律归你）。<br>
+      • <b>Word</b>：文档内是表格按表格逐行；是「一段一家公司」的名单（含阿里金品格式）则自动抽取公司名、联系人、电话、地址、产品、平台、官网。<br>
+      • <b>TXT</b>：同上，适合探迹 / 阿里金品「一段一家公司」的文本名单。</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeModal('myImportModal')">关闭</button>
     </div>
   </div>
 </div>
@@ -1452,6 +1475,88 @@ $("#poolWordImportFile").addEventListener("change",async e=>{
       save();renderPool();refreshDynamic();
       toast("Word 导入完成（名单）：解析 "+recs.length+" 家，新增 "+added+" 家"+(skip?"，跳过 "+skip+" 家":""));
     }
+  }catch(err){toast("导入失败："+err.message);}
+  e.target.value="";
+});
+
+/* ===================== 业务员自助导入（归自己名下的潜在客户） ===================== */
+// 自由文本：先阿里金品格式，回退通用名单
+function parseFreeTextRecs(text){
+  let r=parseAliDocx(text);
+  if(r.length<2){ const alt=parseNameListTxt(text); if(alt.length>r.length) r=alt; }
+  return r;
+}
+// 表格（Excel/CSV/Word表格）→ 客户记录（忽略「负责人」列）
+function tableToCustomerRecs(rows){
+  if(!rows||rows.length<2) return [];
+  const header=rows[0].map(h=>String(h||"").trim());
+  const map={}; CSV_FIELDS.forEach(f=>{const i=findCol(header,f[0],f[1]);if(i>=0)map[f[0]]=i;});
+  if(map.name==null) return null;   // 无「公司名字」列
+  const recs=[];
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i], rec={};
+    CSV_FIELDS.forEach(f=>{if(f[0]==="code"||f[0]==="owner")return;const idx=map[f[0]];if(idx!=null)rec[f[0]]=String(r[idx]||"").trim();});
+    if((rec.name||"").trim()) recs.push(rec);
+  }
+  return recs;
+}
+// 把记录写入 DB.customers，负责人一律设为当前登录人
+function addMyCustomers(recs){
+  const owner=CURRENT?CURRENT.name:"";
+  const existing=new Set(DB.customers.map(c=>c.name));
+  let added=0,skip=0;
+  (recs||[]).forEach(r=>{
+    const name=(r.name||"").trim().replace(/\*/g,""); if(!name){skip++;return;}
+    if(existing.has(name)){skip++;return;}
+    let stage=STAGES.includes(r.stage)?r.stage:"潜在客户";
+    let visited=r.visited==="已拜访"?"已拜访":"未拜访";
+    DB.customers.push({id:uid(),code:nextCode(),name,owner,isPublic:false,stage,visited,
+      attr:r.attr||"",region:r.region||"",contact:r.contact||"",position:r.position||"",phone:r.phone||"",
+      tradeContact:r.tradeContact||"",tradePhone:r.tradePhone||"",product:r.product||"",address:r.address||"",
+      source:r.source||"",platformUrl:r.platformUrl||"",siteUrl:r.siteUrl||"",peerCase:r.peerCase||"",
+      note:r.note||"",createDate:normDate(r.createDate||""),nextFollow:normDate(r.nextFollow||"")});
+    existing.add(name); added++;
+  });
+  if(added){ save(); refreshDynamic(); renderCustomers(); renderDash(); }
+  return {added,skip};
+}
+function myImportDone(res){ toast("已导入到我的客户：新增 "+res.added+" 家"+(res.skip?"，跳过重复/无名 "+res.skip+" 家":"")+(res.added?"（负责人："+(CURRENT?CURRENT.name:"")+"）":"")); }
+// Excel / CSV
+$("#myImportFile").addEventListener("change",async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{
+    const rows=await readTableFile(file);
+    const recs=tableToCustomerRecs(rows);
+    if(recs===null){toast("未找到「公司名字」列，请检查表头");e.target.value="";return;}
+    if(!recs.length){toast("文件为空或无数据行");e.target.value="";return;}
+    myImportDone(addMyCustomers(recs));
+  }catch(err){toast("导入失败："+err.message);}
+  e.target.value="";
+});
+// Word（.docx）：有表格按表格，否则按自由文本
+$("#myWordFile").addEventListener("change",async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{
+    toast("正在解析 Word…");
+    const mammoth=await ensureMammoth();
+    const {value:html}=await mammoth.convertToHtml({arrayBuffer:await readArrayBuffer(file)});
+    const rows=htmlFirstTableRows(html);
+    let recs;
+    if(rows){ recs=tableToCustomerRecs(rows); if(recs===null){toast("Word 表格未找到「公司名字」列");e.target.value="";return;} }
+    else { const {value:text}=await mammoth.extractRawText({arrayBuffer:await readArrayBuffer(file)}); recs=parseFreeTextRecs(text); }
+    if(!recs.length){toast("未从该 Word 解析出公司");e.target.value="";return;}
+    myImportDone(addMyCustomers(recs));
+  }catch(err){toast("导入失败："+err.message);}
+  e.target.value="";
+});
+// TXT 名单
+$("#myTxtFile").addEventListener("change",async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{
+    const text=await readTxtFile(file);
+    const recs=parseFreeTextRecs(text);
+    if(!recs.length){toast("未从该 TXT 解析出公司，请确认是「一段一家公司」的名单格式");e.target.value="";return;}
+    myImportDone(addMyCustomers(recs));
   }catch(err){toast("导入失败："+err.message);}
   e.target.value="";
 });
