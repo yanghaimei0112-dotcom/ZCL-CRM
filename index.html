@@ -495,19 +495,30 @@ function poolToRow(p){return{id:p.id,name:p.name||"",region:p.region||"",attr:p.
 function rowToPool(r){return{id:r.id,name:r.name||"",region:r.region||"",attr:r.attr||"",contact:r.contact||"",phone:r.phone||"",product:r.product||"",address:r.address||"",source:r.source||"",platformUrl:r.platform_url||"",siteUrl:r.site_url||"",tradeContact:r.trade_contact||"",tradePhone:r.trade_phone||"",shareholder:r.shareholder||"",shareholderPhone:r.shareholder_phone||"",peerCase:r.peer_case||"",createDate:r.create_date||"",origin:r.origin||"",note:r.note||"",updatedAt:r.created_at||""};}
 
 const _snap={customers:new Map(),visits:new Map(),pool:new Map()};
+// PostgREST 单次查询最多返回 1000 行 → 分页取全
+async function fetchAllRows(table){
+  const step=1000, all=[];
+  for(let from=0;;from+=step){
+    const {data,error}=await SB.from(table).select("*").order("created_at",{ascending:true}).range(from,from+step-1);
+    if(error)throw error;
+    all.push(...(data||[]));
+    if(!data||data.length<step)break;
+  }
+  return all;
+}
 async function loadFromCloud(){
   if(!SB)return;
   const [pf,cu,vi,po]=await Promise.all([
     SB.from("profiles").select("*"),
-    SB.from("customers").select("*").limit(5000),
-    SB.from("visits").select("*").limit(10000),
-    SB.from("pool").select("*").limit(10000)
+    fetchAllRows("customers"),
+    fetchAllRows("visits"),
+    fetchAllRows("pool")
   ]);
   DB.users=(pf.data||[]).map(r=>({id:r.id,name:r.name,role:r.role,username:r.name}));
   buildNameMaps();
-  DB.customers=(cu.data||[]).map(rowToCust);
-  DB.visits=(vi.data||[]).map(rowToVisit);
-  DB.pool=(po.data||[]).map(rowToPool);
+  DB.customers=(cu||[]).map(rowToCust);
+  DB.visits=(vi||[]).map(rowToVisit);
+  DB.pool=(po||[]).map(rowToPool);
   _snap.customers=new Map(DB.customers.map(c=>[c.id,JSON.stringify(custToRow(c))]));
   _snap.visits=new Map(DB.visits.map(v=>[v.id,JSON.stringify(visitToRow(v))]));
   _snap.pool=new Map(DB.pool.map(p=>[p.id,JSON.stringify(poolToRow(p))]));
@@ -1206,7 +1217,7 @@ const CSV_FIELDS=[["code","编号"],["name","公司名字"],["owner","负责人"
 // 兼容常见导出表头的别名（全角括号、冒号、不同叫法）
 const HEADER_ALIASES={
   "name":["公司名称","公司","客户名称","客户名字","企业名称","单位名称","公司名","名称","公司全称","客户","Company","company","Name","name"],
-  "owner":["业务员","跟进人","负责业务员","经办","跟进业务员"],
+  "owner":["业务员","跟进人","负责业务员","跟进业务员"],
   "contact":["联系人（A)","联系人(A)","联系人（A）","老板","决策人","决策人（A)","决策人(A)","联系人姓名","客户联系人"],
   "phone":["手机号","手机","联系电话","电话号码","决策人电话","联系方式","手机号码","客户电话"],
   "attr":["客户属性 "],
@@ -1219,7 +1230,7 @@ const HEADER_ALIASES={
   "peerCase":["同行案例：","同行案例:"],
   "createDate":["建立日期 ","创建日期"],
   "note":["外贸占比/公司性质","公司性质","外贸占比","跟踪状态","跟进状态","备注 "],
-  "tradeContact":["外贸联系人"],
+  "tradeContact":["外贸联系人","经办","外贸经理","经理","外贸部经理"],
   "tradePhone":["外贸联系电话","外贸部电话","经理电话"]
 };
 function findCol(header,key,label){
@@ -1862,14 +1873,14 @@ function deletePool(){
 }
 // 公海 CSV 导入（适配各表表头）
 const POOL_ALIASES={
-  name:["公司名字","名称","公司名称","公司"],
+  name:["公司名字","名称","公司名称","公司","客户名称","客户名字","企业名称","单位名称","公司名"],
   contact:["联系人（A)","联系人(A)","决策人（A)","决策人(A）","决策人(A)","联系人","决策人","老板","股东"],
-  phone:["电话","决策人（A)电话","决策人(A)电话","联系电话","股东联系方式"],
-  attr:["客户属性"], region:["区域"], product:["主营产品"],
-  address:["客户地址","公司地址","地址"], source:["客户来源","资料来源"],
-  platformUrl:["平台网址","阿里网址","平台"], siteUrl:["独立站网址","独立站"],
-  tradeContact:["外贸部联系人","外贸部经理","其他联系人"],
-  tradePhone:["外贸部联系电话","外贸部经理人联系电话","其他联系人电话"],
+  phone:["电话","决策人（A)电话","决策人(A)电话","联系电话","股东联系方式","手机号","手机","电话号码","手机号码"],
+  attr:["客户属性"], region:["区域","地区","所在区域"], product:["主营产品","产品","经营产品"],
+  address:["客户地址","公司地址","地址","客户精准位置","精准位置","详细地址","客户位置"], source:["客户来源","资料来源"],
+  platformUrl:["平台网址","阿里网址","平台","阿里巴巴国际站","阿里国际站","阿里","店铺"], siteUrl:["独立站网址","独立站","独立站网站","官网","网站"],
+  tradeContact:["外贸部联系人","外贸部经理","其他联系人","经办","外贸经理","经理"],
+  tradePhone:["外贸部联系电话","外贸部经理人联系电话","其他联系人电话","经理电话"],
   peerCase:["同行案例：","同行案例:","同行案例"], createDate:["建立日期","日期","创建日期"]
 };
 function importPoolCSV(input,originName){
