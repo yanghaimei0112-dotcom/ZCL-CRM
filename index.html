@@ -564,6 +564,8 @@ function visibleCustomers(){
   if(!CURRENT) return [];
   return isAdmin()? DB.customers : DB.customers.filter(c=> c.owner===CURRENT.name || c.isPublic);
 }
+// 已拜访判定：visited 标记 或 阶段已到「已拜访 / 已成交」
+function isVisitedCust(c){ return c.visited==="已拜访" || c.stage==="已拜访" || c.stage==="已成交"; }
 // 公海客户（独立资料库，全员可见；可与潜在客户同时存在同一公司）
 function poolCustomers(){
   if(!CURRENT) return [];
@@ -742,7 +744,7 @@ function renderDash(){
   const poolN=poolCustomers().length;
   const vset=new Set();
   visibleVisits().filter(v=>(v.type||"拜访")==="拜访").forEach(v=>vset.add(v.customerId||("name:"+(v.company||custName(v.customerId)))));
-  visibleCustomers().filter(c=>c.visited==="已拜访").forEach(c=>vset.add(c.id));
+  visibleCustomers().filter(isVisitedCust).forEach(c=>vset.add(c.id));
   $("#statCards").innerHTML=[
     ["潜在客户",cs.length,"var(--brand)"],
     ["公海客户",poolN,"#0ea5e9"],
@@ -957,6 +959,8 @@ function saveCustomer(){
     product:$("#c_product").value,address:$("#c_address").value,platformUrl:$("#c_platformUrl").value,siteUrl:$("#c_siteUrl").value,
     createDate:$("#c_createDate").value,nextFollow:$("#c_nextFollow").value,peerCase:$("#c_peerCase").value,
     note:$("#c_note").value};
+  // 阶段进入「已拜访 / 已成交」即视为已拜访，联动 visited 标记
+  if(data.stage==="已拜访"||data.stage==="已成交")data.visited="已拜访";
   data.updatedAt=new Date().toISOString();
   if(editCustId){Object.assign(DB.customers.find(x=>x.id===editCustId),data);}
   else{DB.customers.push(Object.assign({id:uid(),code:nextCode()},data));}
@@ -1004,7 +1008,7 @@ function showDetail(id){
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
       <span style="color:var(--muted)">${esc(c.code)}</span>
       ${pill(c.stage,STAGE_COLOR[c.stage])}${pill(c.attr,ATTR_COLOR[c.attr])}
-      ${pill(c.visited,c.visited==="已拜访"?"#16a34a":"#dc2626")}
+      ${pill(isVisitedCust(c)?"已拜访":"未拜访",isVisitedCust(c)?"#16a34a":"#dc2626")}
       ${c.isPublic?pill("公共客户","#0ea5e9"):""}
     </div>
     <div class="kv">
@@ -1623,7 +1627,7 @@ function renderVisited(){
   if(!CURRENT)return;
   const q=($("#visitedSearch").value||"").toLowerCase(), fo=$("#visitedOwner").value;
   const lastVisit=c=>DB.visits.filter(v=>v.customerId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||""))[0];
-  let rows=visibleCustomers().filter(c=>c.visited==="已拜访");
+  let rows=visibleCustomers().filter(isVisitedCust);
   const owners=[...new Set(rows.map(c=>c.owner).filter(Boolean))].sort();
   const cur=$("#visitedOwner").value;
   $("#visitedOwner").innerHTML=`<option value="">全部负责人</option>`+owners.map(o=>`<option>${esc(o)}</option>`).join("");
