@@ -17,9 +17,10 @@
   header{background:#fff;border-bottom:1px solid var(--line);padding:0 20px;display:flex;align-items:center;
          gap:18px;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
   .logo{font-size:17px;font-weight:700;padding:14px 0;display:flex;align-items:center;gap:8px;white-space:nowrap}
-  nav{display:flex;gap:4px;flex:1}
+  nav{display:flex;gap:4px;flex:1;overflow-x:auto;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
   nav button{background:none;border:none;padding:14px 14px;cursor:pointer;font-size:14px;color:var(--muted);
-             border-bottom:2px solid transparent;font-weight:500}
+             border-bottom:2px solid transparent;font-weight:500;white-space:nowrap;flex-shrink:0}
   nav button.active{color:var(--brand);border-bottom-color:var(--brand)}
   nav button:hover{color:var(--ink)}
   .top-actions{display:flex;gap:8px}
@@ -63,10 +64,10 @@
   .seg button.active{background:var(--brand);color:#fff}
 
   /* table */
-  .tbl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:visible;box-shadow:var(--shadow)}
+  .tbl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow-x:auto;box-shadow:var(--shadow);max-width:100%}
   table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}
   th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #f0f1f3}
-  th{background:#fafbfc;font-weight:600;color:var(--muted);position:sticky;top:100px;z-index:10;cursor:pointer;user-select:none}
+  th{background:#fafbfc;font-weight:600;color:var(--muted);position:sticky;top:0;z-index:10;cursor:pointer;user-select:none}
   th:hover{color:var(--ink)}
   tbody tr:hover{background:#f8faff}
   .clip{display:block;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
