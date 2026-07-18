@@ -1974,14 +1974,9 @@ async function saveUser(){
   if(!email||!pass){toast("请填写登录邮箱和密码");return;}
   if(pass.length<6){toast("密码至少 6 位");return;}
   toast("正在创建账号…");
-  const tmp=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
-  const {data,error}=await tmp.auth.signUp({email,password:pass,options:{data:{name}}});
-  if(error){toast("创建失败："+error.message);return;}
-  const nid=data.user&&data.user.id;
-  if(!nid){toast("创建失败：未返回用户");return;}
-  await new Promise(r=>setTimeout(r,500));
-  const {error:e2}=await SB.from("profiles").update({name,role}).eq("id",nid);
-  if(e2)console.warn("set profile",e2);
+  // 用「仅管理员可调用」的数据库函数创建账号（无需开放注册）
+  const {error}=await SB.rpc("admin_create_user",{p_email:email,p_password:pass,p_name:name,p_role:role});
+  if(error){ toast("创建失败："+error.message+(/admin_create_user|does not exist|schema cache/i.test(error.message)?"（请先在 Supabase 运行新增账号的 SQL）":"")); return; }
   const pf=await SB.from("profiles").select("*");
   DB.users=(pf.data||[]).map(r=>({id:r.id,name:r.name,role:r.role,username:r.name})); buildNameMaps();
   closeModal("userModal");renderUsers();refreshDynamic();
